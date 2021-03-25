@@ -60,6 +60,7 @@
     <Compile Include="Common\ErrorFloodGate.cs" />
     <Compile Include="Common\NuGetEvent.cs" />
     <Compile Include="Common\NuGetEventTrigger.cs" />
+    <Compile Include="Converters\AcceleratorKeyConverter.cs" />
     <Compile Include="Converters\AdditionConverter.cs" />
     <Compile Include="Converters\BooleanToGridRowHeightConverter.cs" />
     <Compile Include="Converters\AccessibleConverter.cs" />
