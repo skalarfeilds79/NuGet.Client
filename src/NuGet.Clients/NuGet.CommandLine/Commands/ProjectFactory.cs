@@ -28,14 +28,12 @@ using XElementExtensions = NuGet.Packaging.XElementExtensions;
 namespace NuGet.CommandLine
 {
 
-    [SuppressMessage("Microsoft.Maintainability", "CA1506:AvoidExcessiveClassCoupling")]
     public class ProjectFactory : MSBuildUser, IProjectFactory, CoreV2.NuGet.IPropertyProvider
     {
         // Its type is Microsoft.Build.Evaluation.Project
         private dynamic _project;
 
-        private Common.ILogger _logger;
-        private bool _usingJsonFile;
+        private ILogger _logger;
 
         // Files we want to always exclude from the resulting package
         private static readonly HashSet<string> _excludeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
@@ -128,7 +126,7 @@ namespace NuGet.CommandLine
             AddSolutionDir();
             // Get the target framework of the project
             string targetFrameworkMoniker = _project.GetPropertyValue("TargetFrameworkMoniker");
-            if (!String.IsNullOrEmpty(targetFrameworkMoniker))
+            if (!string.IsNullOrEmpty(targetFrameworkMoniker))
             {
                 TargetFramework = NuGetFramework.Parse(targetFrameworkMoniker);
             }
@@ -275,22 +273,9 @@ namespace NuGet.CommandLine
                 }
             }
 
-            Packaging.Manifest manifest = null;
-
-            // If there is a project.json file, load that and skip any nuspec that may exist
-            if (!PackCommandRunner.ProcessProjectJsonFile(builder, _project.DirectoryPath as string, builder.Id, version, suffix, GetPropertyValue))
-            {
-                // If the package contains a nuspec file then use it for metadata
-                manifest = ProcessNuspec(builder, basePath);
-            }
-            else
-            {
-                Logger.Log(
-                    PackagingLogMessage.CreateWarning(
-                        string.Format(NuGetResources.ProjectJsonPack_Deprecated, builder.Id),
-                        NuGetLogCode.NU5126));
-                _usingJsonFile = true;
-            }
+            Manifest manifest = null;
+            // If the package contains a nuspec file then use it for metadata
+            manifest = ProcessNuspec(builder, basePath);
 
             // Remove the extra author
             if (builder.Authors.Count > 1)
@@ -324,7 +309,7 @@ namespace NuGet.CommandLine
             ProcessDependencies(builder);
 
             // Set defaults if some required fields are missing
-            if (String.IsNullOrEmpty(builder.Description))
+            if (string.IsNullOrEmpty(builder.Description))
             {
                 builder.Description = "Description";
                 Logger.Log(PackagingLogMessage.CreateWarning(string.Format(
@@ -365,23 +350,23 @@ namespace NuGet.CommandLine
 
             _properties.Add("Version", metadata.Version.ToFullString());
 
-            if (!String.IsNullOrEmpty(metadata.Title))
+            if (!string.IsNullOrEmpty(metadata.Title))
             {
                 _properties.Add("Title", metadata.Title);
             }
 
-            if (!String.IsNullOrEmpty(metadata.Description))
+            if (!string.IsNullOrEmpty(metadata.Description))
             {
                 _properties.Add("Description", metadata.Description);
             }
 
-            if (!String.IsNullOrEmpty(metadata.Copyright))
+            if (!string.IsNullOrEmpty(metadata.Copyright))
             {
                 _properties.Add("Copyright", metadata.Copyright);
             }
 
             string projectAuthor = metadata.Authors.FirstOrDefault();
-            if (!String.IsNullOrEmpty(projectAuthor))
+            if (!string.IsNullOrEmpty(projectAuthor))
             {
                 _properties.Add("Author", projectAuthor);
             }
@@ -431,7 +416,7 @@ namespace NuGet.CommandLine
                 // Make if the target path doesn't exist, fail
                 if (!Directory.Exists(TargetPath) && !File.Exists(TargetPath))
                 {
-                    throw new PackagingException(NuGetLogCode.NU5012, String.Format(CultureInfo.CurrentCulture, LocalizedResourceManager.GetString("UnableToFindBuildOutput"), TargetPath));
+                    throw new PackagingException(NuGetLogCode.NU5012, string.Format(CultureInfo.CurrentCulture, LocalizedResourceManager.GetString("UnableToFindBuildOutput"), TargetPath));
                 }
             }
         }
@@ -450,7 +435,7 @@ namespace NuGet.CommandLine
             if (0 != result) // 0 is msbuild.exe success code
             {
                 // If the build fails, report the error
-                var error = String.Format(CultureInfo.CurrentCulture, LocalizedResourceManager.GetString("FailedToBuildProject"), Path.GetFileName(_project.FullPath));
+                var error = string.Format(CultureInfo.CurrentCulture, LocalizedResourceManager.GetString("FailedToBuildProject"), Path.GetFileName(_project.FullPath));
                 throw new PackagingException(NuGetLogCode.NU5013, error);
             }
 
@@ -696,14 +681,8 @@ namespace NuGet.CommandLine
             }
         }
 
-        private bool ProcessJsonFile(PackageBuilder builder, string basePath, string id)
-        {
-            return PackCommandRunner.ProcessProjectJsonFile(builder, basePath, id, null, null, GetPropertyValue);
-        }
-
         // Creates a package dependency from the given project, which has a corresponding
         // nuspec file.
-        [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "We want to continue regardless of any error we encounter extracting metadata.")]
         private PackageDependency CreateDependencyFromProject(dynamic project, Dictionary<string, Packaging.Core.PackageDependency> dependencies)
         {
             try
@@ -713,23 +692,13 @@ namespace NuGet.CommandLine
                 projectFactory.ProjectProperties = ProjectProperties;
                 projectFactory.SymbolPackageFormat = SymbolPackageFormat;
                 projectFactory.BuildProject();
-                var builder = new Packaging.PackageBuilder();
+                var builder = new PackageBuilder();
 
                 projectFactory.ExtractMetadata(builder);
 
                 projectFactory.InitializeProperties(builder);
 
-                if (!projectFactory.ProcessJsonFile(builder, project.DirectoryPath, null))
-                {
-                    projectFactory.ProcessNuspec(builder, null);
-                }
-                else
-                {
-                    Logger.Log(
-                    PackagingLogMessage.CreateWarning(
-                        string.Format(NuGetResources.ProjectJsonPack_Deprecated, builder.Id),
-                        NuGetLogCode.NU5126));
-                }
+                projectFactory.ProcessNuspec(builder, null);
 
                 VersionRange versionRange = null;
                 if (dependencies.ContainsKey(builder.Id))
@@ -746,7 +715,7 @@ namespace NuGet.CommandLine
                     versionRange = VersionRange.Parse(builder.Version.ToString());
                 }
 
-                return new Packaging.Core.PackageDependency(
+                return new PackageDependency(
                     builder.Id,
                     versionRange);
             }
@@ -790,22 +759,7 @@ namespace NuGet.CommandLine
         private void AddOutputFiles(Packaging.PackageBuilder builder)
         {
             // Get the target framework of the project
-            NuGetFramework nugetFramework;
-            if (_usingJsonFile && builder.TargetFrameworks.Any())
-            {
-                if (builder.TargetFrameworks.Count > 1)
-                {
-                    var message = string.Format(
-                    CultureInfo.CurrentCulture,
-                    LocalizedResourceManager.GetString("Error_MultipleTargetFrameworks"));
-                    throw new PackagingException(NuGetLogCode.NU5015, message);
-                }
-                nugetFramework = builder.TargetFrameworks.First();
-            }
-            else
-            {
-                nugetFramework = TargetFramework;
-            }
+            NuGetFramework nugetFramework = TargetFramework;
 
             var projectOutputDirectory = Path.GetDirectoryName(TargetPath);
             string targetFileName;
@@ -879,7 +833,7 @@ namespace NuGet.CommandLine
         private void ProcessDependencies(Packaging.PackageBuilder builder)
         {
             // get all packages and dependencies, including the ones in project references
-            var packagesAndDependencies = new Dictionary<String, Tuple<PackageReaderBase, Packaging.Core.PackageDependency>>();
+            var packagesAndDependencies = new Dictionary<string, Tuple<PackageReaderBase, Packaging.Core.PackageDependency>>();
             ApplyAction(p => p.AddDependencies(packagesAndDependencies));
 
             // list of all dependency packages
@@ -888,12 +842,8 @@ namespace NuGet.CommandLine
             // Add the transform file to the package builder
             ProcessTransformFiles(builder, packages.SelectMany(GetTransformFiles));
 
-            var dependencies = new Dictionary<string, Packaging.Core.PackageDependency>();
-            if (!_usingJsonFile)
-            {
-                dependencies = builder.DependencyGroups.SelectMany(d => d.Packages)
-                .ToDictionary(d => d.Id, StringComparer.OrdinalIgnoreCase);
-            }
+            var dependencies = builder.DependencyGroups.SelectMany(d => d.Packages)
+            .ToDictionary(d => d.Id, StringComparer.OrdinalIgnoreCase);
 
             // Reduce the set of packages we want to include as dependencies to the minimal set.
             // Normally, packages.config has the full closure included, we only add top level
@@ -917,47 +867,12 @@ namespace NuGet.CommandLine
                 AddProjectReferenceDependencies(dependencies);
             }
 
-            if (_usingJsonFile)
-            {
-                if (dependencies.Any())
-                {
-                    if (builder.DependencyGroups.Any())
-                    {
-                        var i = 0;
-                        foreach (var group in builder.DependencyGroups.ToList())
-                        {
-                            ISet<Packaging.Core.PackageDependency> newPackagesList = new HashSet<Packaging.Core.PackageDependency>(group.Packages);
-                            foreach (var dependency in dependencies)
-                            {
-                                if (!newPackagesList.Contains(dependency.Value))
-                                {
-                                    newPackagesList.Add(dependency.Value);
-                                }
-                            }
+            // TO FIX: when we persist the target framework into packages.config file,
+            // we need to pull that info into building the PackageDependencySet object
+            builder.DependencyGroups.Clear();
 
-                            var dependencyGroup = new PackageDependencyGroup(group.TargetFramework, newPackagesList);
-
-                            builder.DependencyGroups.RemoveAt(i);
-                            builder.DependencyGroups.Insert(i, dependencyGroup);
-
-                            i++;
-                        }
-                    }
-                    else
-                    {
-                        builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework, new HashSet<Packaging.Core.PackageDependency>(dependencies.Values)));
-                    }
-                }
-            }
-            else
-            {
-                // TO FIX: when we persist the target framework into packages.config file,
-                // we need to pull that info into building the PackageDependencySet object
-                builder.DependencyGroups.Clear();
-
-                // REVIEW: IS NuGetFramework.AnyFramework correct?
-                builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework, new HashSet<Packaging.Core.PackageDependency>(dependencies.Values)));
-            }
+            // REVIEW: IS NuGetFramework.AnyFramework correct?
+            builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework, new HashSet<Packaging.Core.PackageDependency>(dependencies.Values)));
         }
 
         private bool FindDependency(PackageIdentity projectPackage, IEnumerable<Tuple<PackageReaderBase, Packaging.Core.PackageDependency>> packagesAndDependencies)
@@ -990,7 +905,7 @@ namespace NuGet.CommandLine
             return !found;
         }
 
-        private void AddDependencies(Dictionary<String, Tuple<PackageReaderBase, Packaging.Core.PackageDependency>> packagesAndDependencies)
+        private void AddDependencies(Dictionary<string, Tuple<PackageReaderBase, Packaging.Core.PackageDependency>> packagesAndDependencies)
         {
             Dictionary<string, object> props = new Dictionary<string, object>();
 
@@ -1095,7 +1010,7 @@ namespace NuGet.CommandLine
             }
         }
 
-        private static void DisposePackageReaders(Dictionary<String, Tuple<PackageReaderBase, PackageDependency>> packagesAndDependencies)
+        private static void DisposePackageReaders(Dictionary<string, Tuple<PackageReaderBase, PackageDependency>> packagesAndDependencies)
         {
             // Release the open file handles
             foreach (var package in packagesAndDependencies)
@@ -1175,7 +1090,7 @@ namespace NuGet.CommandLine
             // Add a path separator for Visual Studio macro compatibility
             solutionDir += Path.DirectorySeparatorChar;
 
-            if (!String.IsNullOrEmpty(solutionDir))
+            if (!string.IsNullOrEmpty(solutionDir))
             {
                 if (ProjectProperties.ContainsKey("SolutionDir"))
                 {
@@ -1198,11 +1113,11 @@ namespace NuGet.CommandLine
             return ProjectHelper.GetSolutionDir(_project.DirectoryPath);
         }
 
-        private Packaging.Manifest ProcessNuspec(Packaging.PackageBuilder builder, string basePath)
+        private Manifest ProcessNuspec(PackageBuilder builder, string basePath)
         {
             string nuspecFile = GetNuspec();
 
-            if (String.IsNullOrEmpty(nuspecFile))
+            if (string.IsNullOrEmpty(nuspecFile))
             {
                 return null;
             }
@@ -1221,7 +1136,7 @@ namespace NuGet.CommandLine
 
                 if (manifest.HasFilesNode)
                 {
-                    basePath = String.IsNullOrEmpty(basePath) ? Path.GetDirectoryName(nuspecFile) : basePath;
+                    basePath = string.IsNullOrEmpty(basePath) ? Path.GetDirectoryName(nuspecFile) : basePath;
                     builder.PopulateFiles(basePath, manifest.Files);
                 }
 

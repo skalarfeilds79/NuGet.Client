@@ -728,33 +728,9 @@ namespace NuGet.ProjectModel.Test
 
             var packageSpec = new PackageSpec()
             {
-                Authors = unsortedArray,
-                BuildOptions = new BuildOptions() { OutputName = "outputName" },
-                ContentFiles = new List<string>(unsortedArray),
-                Copyright = "copyright",
                 Dependencies = new List<LibraryDependency>() { libraryDependency, libraryDependencyWithNoWarnGlobal },
-                Description = "description",
                 FilePath = "filePath",
-                HasVersionSnapshot = true,
-                IconUrl = "iconUrl",
-                IsDefaultVersion = false,
-                Language = "language",
-                LicenseUrl = "licenseUrl",
                 Name = "name",
-                Owners = unsortedArray,
-                PackOptions = new PackOptions()
-                {
-                    IncludeExcludeFiles = new IncludeExcludeFiles()
-                    {
-                        Exclude = unsortedReadOnlyList,
-                        ExcludeFiles = unsortedReadOnlyList,
-                        Include = unsortedReadOnlyList,
-                        IncludeFiles = unsortedReadOnlyList
-                    }
-                },
-                ProjectUrl = "projectUrl",
-                ReleaseNotes = "releaseNotes",
-                RequireLicenseAcceptance = true,
                 RestoreMetadata = new ProjectRestoreMetadata()
                 {
                     CrossTargeting = true,
@@ -778,8 +754,6 @@ namespace NuGet.ProjectModel.Test
                             new ProjectRestoreMetadataFrameworkInfo(nugetFramework)
                         }
                 },
-                Summary = "summary",
-                Tags = unsortedArray,
                 Title = "title",
                 Version = new NuGetVersion("1.2.3")
             };
@@ -793,10 +767,6 @@ namespace NuGet.ProjectModel.Test
             {
                 packageSpec.RestoreMetadata.ProjectWideWarningProperties = warningProperties;
             }
-
-            packageSpec.PackInclude.Add("b", "d");
-            packageSpec.PackInclude.Add("a", "e");
-            packageSpec.PackInclude.Add("c", "f");
 
             var runtimeDependencySet = new RuntimeDependencySet("id", new[]
             {
@@ -812,10 +782,6 @@ namespace NuGet.ProjectModel.Test
             };
 
             packageSpec.RuntimeGraph = new RuntimeGraph(runtimes, compatibilityProfiles);
-
-            packageSpec.Scripts.Add("b", unsortedArray);
-            packageSpec.Scripts.Add("a", unsortedArray);
-            packageSpec.Scripts.Add("c", unsortedArray);
 
             packageSpec.TargetFrameworks.Add(new TargetFrameworkInformation()
             {

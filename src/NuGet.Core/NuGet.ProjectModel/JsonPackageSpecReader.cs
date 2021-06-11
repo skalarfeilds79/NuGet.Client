@@ -85,8 +85,6 @@ namespace NuGet.ProjectModel
 
             List<CompatibilityProfile> compatibilityProfiles = null;
             List<RuntimeDescription> runtimeDescriptions = null;
-            var wasPackOptionsSet = false;
-            var isMappingsNull = false;
 
             string filePath = name == null ? null : Path.GetFullPath(packageSpecPath);
 
@@ -99,27 +97,6 @@ namespace NuGet.ProjectModel
 
                 switch (propertyName)
                 {
-                    case "authors":
-                        packageSpec.Authors = ReadStringArray(jsonReader) ?? Array.Empty<string>();
-                        break;
-
-                    case "buildOptions":
-                        ReadBuildOptions(jsonReader, packageSpec);
-                        break;
-
-                    case "contentFiles":
-                        List<string> contentFiles = jsonReader.ReadStringArrayAsList();
-
-                        if (contentFiles != null)
-                        {
-                            packageSpec.ContentFiles = contentFiles;
-                        }
-                        break;
-
-                    case "copyright":
-                        packageSpec.Copyright = jsonReader.ReadNextTokenAsString();
-                        break;
-
                     case "dependencies":
                         ReadDependencies(
                             jsonReader,
@@ -128,25 +105,8 @@ namespace NuGet.ProjectModel
                             isGacOrFrameworkReference: false);
                         break;
 
-                    case "description":
-                        packageSpec.Description = jsonReader.ReadNextTokenAsString();
-                        break;
-
                     case "frameworks":
                         ReadFrameworks(jsonReader, packageSpec);
-                        break;
-
-                    case "language":
-                        packageSpec.Language = jsonReader.ReadNextTokenAsString();
-                        break;
-
-                    case "packInclude":
-                        ReadPackInclude(jsonReader, packageSpec);
-                        break;
-
-                    case "packOptions":
-                        ReadPackOptions(jsonReader, packageSpec, ref isMappingsNull);
-                        wasPackOptionsSet = true;
                         break;
 
                     case "restore":
@@ -155,10 +115,6 @@ namespace NuGet.ProjectModel
 
                     case "runtimes":
                         runtimeDescriptions = ReadRuntimes(jsonReader);
-                        break;
-
-                    case "scripts":
-                        ReadScripts(jsonReader, packageSpec);
                         break;
 
                     case "supports":
@@ -176,7 +132,6 @@ namespace NuGet.ProjectModel
                         {
                             try
                             {
-                                packageSpec.HasVersionSnapshot = PackageSpecUtility.IsSnapshotVersion(version);
                                 packageSpec.Version = PackageSpecUtility.SpecifySnapshot(version, snapshotValue);
                             }
                             catch (Exception ex)
@@ -190,21 +145,6 @@ namespace NuGet.ProjectModel
 
             packageSpec.Name = name;
             packageSpec.FilePath = name == null ? null : Path.GetFullPath(packageSpecPath);
-
-            if (!wasPackOptionsSet)
-            {
-                packageSpec.Owners = Array.Empty<string>();
-                packageSpec.PackOptions = new PackOptions()
-                {
-                    PackageType = Array.Empty<PackageType>()
-                };
-                packageSpec.Tags = Array.Empty<string>();
-            }
-
-            if (isMappingsNull)
-            {
-                packageSpec.PackOptions.Mappings = null;
-            }
 
             packageSpec.RuntimeGraph = new RuntimeGraph(
                 runtimeDescriptions ?? Enumerable.Empty<RuntimeDescription>(),
@@ -230,19 +170,6 @@ namespace NuGet.ProjectModel
             var name = (string)jsonReader.Value;
 
             return new PackageType(name, Packaging.Core.PackageType.EmptyVersion);
-        }
-
-        private static void ReadBuildOptions(JsonTextReader jsonReader, PackageSpec packageSpec)
-        {
-            packageSpec.BuildOptions = new BuildOptions();
-
-            jsonReader.ReadObject(buildOptionsPropertyName =>
-            {
-                if (buildOptionsPropertyName == "outputName")
-                {
-                    packageSpec.BuildOptions.OutputName = jsonReader.ReadNextTokenAsString();
-                }
-            });
         }
 
         private static void ReadCentralPackageVersions(
@@ -1257,11 +1184,6 @@ namespace NuGet.ProjectModel
                         default:
                             throw new InvalidCastException();
                     }
-
-                    if (packageTypes != null)
-                    {
-                        packageSpec.PackOptions.PackageType = packageTypes;
-                    }
                 }
             }
             catch (Exception)
@@ -1275,131 +1197,6 @@ namespace NuGet.ProjectModel
                     errorColumn,
                     packageSpec.FilePath);
             }
-        }
-
-        private static void ReadPackInclude(JsonTextReader jsonReader, PackageSpec packageSpec)
-        {
-            jsonReader.ReadObject(propertyName =>
-            {
-                string propertyValue = jsonReader.ReadAsString();
-
-                packageSpec.PackInclude.Add(new KeyValuePair<string, string>(propertyName, propertyValue));
-            });
-        }
-
-        private static void ReadPackOptions(JsonTextReader jsonReader, PackageSpec packageSpec, ref bool isMappingsNull)
-        {
-            var wasMappingsRead = false;
-
-            bool isPackOptionsValueAnObject = jsonReader.ReadObject(propertyName =>
-            {
-                switch (propertyName)
-                {
-                    case "files":
-                        wasMappingsRead = ReadPackOptionsFiles(packageSpec, jsonReader, wasMappingsRead);
-                        break;
-
-                    case "iconUrl":
-                        packageSpec.IconUrl = jsonReader.ReadNextTokenAsString();
-                        break;
-
-                    case "licenseUrl":
-                        packageSpec.LicenseUrl = jsonReader.ReadNextTokenAsString();
-                        break;
-
-                    case "owners":
-                        string[] owners = ReadStringArray(jsonReader);
-
-                        if (owners != null)
-                        {
-                            packageSpec.Owners = owners;
-                        }
-                        break;
-
-                    case "packageType":
-                        ReadPackageTypes(packageSpec, jsonReader);
-                        break;
-
-                    case "projectUrl":
-                        packageSpec.ProjectUrl = jsonReader.ReadNextTokenAsString();
-                        break;
-
-                    case "releaseNotes":
-                        packageSpec.ReleaseNotes = jsonReader.ReadNextTokenAsString();
-                        break;
-
-                    case "requireLicenseAcceptance":
-                        packageSpec.RequireLicenseAcceptance = ReadNextTokenAsBoolOrFalse(jsonReader, packageSpec.FilePath);
-                        break;
-
-                    case "summary":
-                        packageSpec.Summary = jsonReader.ReadNextTokenAsString();
-                        break;
-
-                    case "tags":
-                        string[] tags = ReadStringArray(jsonReader);
-
-                        if (tags != null)
-                        {
-                            packageSpec.Tags = tags;
-                        }
-                        break;
-                }
-            });
-
-            isMappingsNull = isPackOptionsValueAnObject && !wasMappingsRead;
-        }
-
-        private static bool ReadPackOptionsFiles(PackageSpec packageSpec, JsonTextReader jsonReader, bool wasMappingsRead)
-        {
-            IReadOnlyList<string> excludeFiles = null;
-            IReadOnlyList<string> exclude = null;
-            IReadOnlyList<string> includeFiles = null;
-            IReadOnlyList<string> include = null;
-
-            jsonReader.ReadObject(filesPropertyName =>
-            {
-                switch (filesPropertyName)
-                {
-                    case "excludeFiles":
-                        excludeFiles = jsonReader.ReadStringOrArrayOfStringsAsReadOnlyList();
-                        break;
-
-                    case "exclude":
-                        exclude = jsonReader.ReadStringOrArrayOfStringsAsReadOnlyList();
-                        break;
-
-                    case "includeFiles":
-                        includeFiles = jsonReader.ReadStringOrArrayOfStringsAsReadOnlyList();
-                        break;
-
-                    case "include":
-                        include = jsonReader.ReadStringOrArrayOfStringsAsReadOnlyList();
-                        break;
-
-                    case "mappings":
-                        jsonReader.ReadObject(mappingsPropertyName =>
-                        {
-                            wasMappingsRead = true;
-
-                            ReadMappings(jsonReader, mappingsPropertyName, packageSpec.PackOptions.Mappings);
-                        });
-                        break;
-                }
-            });
-
-            if (include != null || includeFiles != null || exclude != null || excludeFiles != null)
-            {
-                packageSpec.PackOptions.IncludeExcludeFiles = new IncludeExcludeFiles()
-                {
-                    ExcludeFiles = excludeFiles,
-                    Exclude = exclude,
-                    IncludeFiles = includeFiles,
-                    Include = include
-                };
-            }
-
-            return wasMappingsRead;
         }
 
         private static RuntimeDependencySet ReadRuntimeDependencySet(JsonTextReader jsonReader, string dependencySetName)
@@ -1459,39 +1256,6 @@ namespace NuGet.ProjectModel
             });
 
             return runtimeDescriptions;
-        }
-
-        private static void ReadScripts(JsonTextReader jsonReader, PackageSpec packageSpec)
-        {
-            jsonReader.ReadObject(propertyName =>
-            {
-                if (jsonReader.ReadNextToken())
-                {
-                    if (jsonReader.TokenType == JsonToken.String)
-                    {
-                        packageSpec.Scripts[propertyName] = new string[] { (string)jsonReader.Value };
-                    }
-                    else if (jsonReader.TokenType == JsonToken.StartArray)
-                    {
-                        var list = new List<string>();
-
-                        while (jsonReader.ReadNextToken() && jsonReader.TokenType == JsonToken.String)
-                        {
-                            list.Add((string)jsonReader.Value);
-                        }
-
-                        packageSpec.Scripts[propertyName] = list;
-                    }
-                    else
-                    {
-                        throw FileFormatException.Create(
-                            string.Format("The value of a script in '{0}' can only be a string or an array of strings", PackageSpec.PackageSpecFileName),
-                            jsonReader.LineNumber,
-                            jsonReader.LinePosition,
-                            packageSpec.FilePath);
-                    }
-                }
-            });
         }
 
         private static string[] ReadStringArray(JsonTextReader jsonReader)
