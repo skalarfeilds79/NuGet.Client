@@ -19,7 +19,8 @@ namespace NuGet.PackageManagement.VisualStudio
             IMSBuildProjectSystem msbuildNuGetProjectSystem,
             string folderNuGetProjectPath,
             string packagesConfigFolderPath,
-            INuGetProjectServices projectServices)
+            INuGetProjectServices projectServices,
+            string projectId)
             : base(
                 msbuildNuGetProjectSystem,
                 folderNuGetProjectPath,
@@ -29,7 +30,7 @@ namespace NuGet.PackageManagement.VisualStudio
             Assumes.Present(msbuildNuGetProjectSystem);
             Assumes.Present(projectServices);
 
-            InternalMetadata.Add(NuGetProjectMetadataKeys.ProjectId, projectAdapter.ProjectId);
+            InternalMetadata.Add(NuGetProjectMetadataKeys.ProjectId, projectId);
 
             ProjectServices = projectServices;
         }

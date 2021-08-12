@@ -135,18 +135,16 @@ namespace NuGet.PackageManagement.VisualStudio
 
         public EnvDTE.Project Project => _dteProject.Value;
 
-        public string ProjectId
+        public async Task<string> GetProjectIdAsync()
         {
-            get
+            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            Guid id;
+            if (!_vsHierarchyItem.TryGetProjectId(out id))
             {
-                Guid id;
-                if (!_vsHierarchyItem.TryGetProjectId(out id))
-                {
-                    id = Guid.Empty;
-                }
-
-                return id.ToString();
+                id = Guid.Empty;
             }
+
+            return id.ToString();
         }
 
         public string ProjectName => ProjectNames.ShortName;

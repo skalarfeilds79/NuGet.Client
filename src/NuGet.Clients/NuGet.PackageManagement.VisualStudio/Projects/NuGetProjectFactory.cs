@@ -67,14 +67,7 @@ namespace NuGet.PackageManagement.VisualStudio
             Assumes.Present(vsProjectAdapter);
             Assumes.Present(context);
 
-            await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            if (vsProjectAdapter.VsHierarchy != null &&
-                VsHierarchyUtility.IsCPSCapabilityCompliant(vsProjectAdapter.VsHierarchy))
-            {
-                // Lazy load the CPS enabled JoinableTaskFactory for the UI.
-                NuGetUIThreadHelper.SetJoinableTaskFactoryFromService(ProjectServiceAccessor.Value as IProjectServiceAccessor);
-            }
+            await UpdateJoinableTaskFactoryIfNecessaryAsync(vsProjectAdapter);
 
             var exceptions = new List<Exception>();
             foreach (var provider in _providers)
@@ -104,6 +97,18 @@ namespace NuGet.PackageManagement.VisualStudio
             return null;
         }
 
+        private async Task UpdateJoinableTaskFactoryIfNecessaryAsync(IVsProjectAdapter vsProjectAdapter)
+        {
+            await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            if (vsProjectAdapter.VsHierarchy != null &&
+                VsHierarchyUtility.IsCPSCapabilityCompliant(vsProjectAdapter.VsHierarchy))
+            {
+                // Lazy load the CPS enabled JoinableTaskFactory for the UI.
+                NuGetUIThreadHelper.SetJoinableTaskFactoryFromService(ProjectServiceAccessor.Value as IProjectServiceAccessor);
+            }
+        }
+
         /// <summary>
         /// Creates an instance of <see cref="NuGetProject"/> of desired type.
         /// </summary>
@@ -119,8 +124,6 @@ namespace NuGet.PackageManagement.VisualStudio
         {
             Assumes.Present(vsProjectAdapter);
 
-            await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
-
             var provider = _providers
                 .FirstOrDefault(p => typeof(TProject).TypeHandle.Equals(p.ProjectType));
 
@@ -129,12 +132,7 @@ namespace NuGet.PackageManagement.VisualStudio
                 return null;
             }
 
-            if (vsProjectAdapter.VsHierarchy != null &&
-                VsHierarchyUtility.IsCPSCapabilityCompliant(vsProjectAdapter.VsHierarchy))
-            {
-                // Lazy load the CPS enabled JoinableTaskFactory for the UI.
-                NuGetUIThreadHelper.SetJoinableTaskFactoryFromService(ProjectServiceAccessor.Value as IProjectServiceAccessor);
-            }
+            await UpdateJoinableTaskFactoryIfNecessaryAsync(vsProjectAdapter);
 
             try
             {

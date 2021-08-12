@@ -349,8 +349,6 @@ namespace NuGet.PackageManagement.VisualStudio
 
         public async Task<bool> IsSolutionAvailableAsync()
         {
-            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
             if (!await IsSolutionOpenAsync())
             {
                 // Solution is not open. Return false.
@@ -359,7 +357,7 @@ namespace NuGet.PackageManagement.VisualStudio
 
             await EnsureInitializeAsync();
 
-            if (!DoesSolutionRequireAnInitialSaveAs())
+            if (!await DoesSolutionRequireAnInitialSaveAs())
             {
                 // Solution is open and 'Save As' is not required. Return true.
                 return true;
@@ -469,9 +467,9 @@ namespace NuGet.PackageManagement.VisualStudio
         /// <summary>
         /// Checks whether the current solution is saved to disk, as opposed to be in memory.
         /// </summary>
-        private bool DoesSolutionRequireAnInitialSaveAs()
+        private async Task<bool> DoesSolutionRequireAnInitialSaveAs()
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
+            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             // Check if user is doing File - New File without saving the solution.
             var value = GetVSSolutionProperty((int)(__VSPROPID.VSPROPID_IsSolutionSaveAsRequired));
@@ -499,11 +497,7 @@ namespace NuGet.PackageManagement.VisualStudio
 
         private async Task OnSolutionExistsAndFullyLoadedAsync()
         {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            SolutionOpening?.Invoke(this, EventArgs.Empty);
-
-            NuGetPowerShellUsage.RaiseSolutionOpenEvent();
+            await RaiseSolutionOpenEventAsync();
 
             // although the SolutionOpened event fires, the solution may be only in memory (e.g. when
             // doing File - New File). In that case, we don't want to act on the event.
@@ -514,9 +508,25 @@ namespace NuGet.PackageManagement.VisualStudio
 
             await EnsureNuGetAndVsProjectAdapterCacheAsync();
 
-            SolutionOpened?.Invoke(this, EventArgs.Empty);
+            await RaiseSolutionOpenedEventAsync();
 
             _solutionOpenedRaised = true;
+        }
+
+        private async Task RaiseSolutionOpenEventAsync()
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            SolutionOpening?.Invoke(this, EventArgs.Empty);
+
+            NuGetPowerShellUsage.RaiseSolutionOpenEvent();
+        }
+
+        private async Task RaiseSolutionOpenedEventAsync()
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            SolutionOpened?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnAfterClosing()
@@ -683,22 +693,11 @@ namespace NuGet.PackageManagement.VisualStudio
         {
             await _initLock.ExecuteNuGetOperationAsync(async () =>
             {
-                await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
                 if (!_cacheInitialized && await IsSolutionOpenAsync())
                 {
                     try
                     {
-                        var dte = await _asyncServiceProvider.GetDTEAsync();
-
-                        var supportedProjects = new List<Project>();
-                        foreach (Project project in await EnvDTESolutionUtility.GetAllEnvDTEProjectsAsync(dte))
-                        {
-                            if (await EnvDTEProjectUtility.IsSupportedAsync(project))
-                            {
-                                supportedProjects.Add(project);
-                            }
-                        }
+                        List<Project> supportedProjects = await GetSupportProjectsAsync();
 
                         foreach (var project in supportedProjects)
                         {
@@ -730,6 +729,23 @@ namespace NuGet.PackageManagement.VisualStudio
                     }
                 }
             }, CancellationToken.None);
+        }
+
+        private async Task<List<Project>> GetSupportProjectsAsync()
+        {
+            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            var dte = await _asyncServiceProvider.GetDTEAsync();
+
+            var supportedProjects = new List<Project>();
+            foreach (Project project in await EnvDTESolutionUtility.GetAllEnvDTEProjectsAsync(dte))
+            {
+                if (await EnvDTEProjectUtility.IsSupportedAsync(project))
+                {
+                    supportedProjects.Add(project);
+                }
+            }
+
+            return supportedProjects;
         }
 
         private async Task AddVsProjectAdapterToCacheAsync(IVsProjectAdapter vsProjectAdapter)
@@ -799,7 +815,6 @@ namespace NuGet.PackageManagement.VisualStudio
         {
             try
             {
-                // If already initialized, need not be on the UI thread
                 if (_initialized)
                 {
                     await EnsureNuGetAndVsProjectAdapterCacheAsync();
@@ -816,12 +831,9 @@ namespace NuGet.PackageManagement.VisualStudio
                         return;
                     }
 
-                    await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
                     await InitializeAsync();
 
-                    var dte = await _asyncServiceProvider.GetDTEAsync();
-                    if (dte.Solution.IsOpen)
+                    if (await IsSolutionOpenAsync())
                     {
                         await OnSolutionExistsAndFullyLoadedAsync();
                     }
@@ -950,10 +962,8 @@ namespace NuGet.PackageManagement.VisualStudio
 
         #region IVsSolutionManager
 
-        public async Task<NuGetProject> GetOrCreateProjectAsync(EnvDTE.Project project, INuGetProjectContext projectContext)
+        public async Task<NuGetProject> GetOrCreateProjectAsync(Project project, INuGetProjectContext projectContext)
         {
-            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
             var projectSafeName = await project.GetCustomUniqueNameAsync();
             var nuGetProject = await GetNuGetProjectAsync(projectSafeName);
 
@@ -992,9 +1002,8 @@ namespace NuGet.PackageManagement.VisualStudio
 
         public async Task<bool> IsSolutionFullyLoadedAsync()
         {
-            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
             await EnsureInitializeAsync();
+            await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
             var value = GetVSSolutionProperty((int)(__VSPROPID4.VSPROPID_IsSolutionFullyLoaded));
             return (bool)value;
         }

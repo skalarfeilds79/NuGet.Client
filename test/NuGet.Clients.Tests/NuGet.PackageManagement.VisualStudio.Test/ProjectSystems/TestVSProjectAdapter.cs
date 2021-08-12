@@ -89,12 +89,9 @@ namespace NuGet.PackageManagement.VisualStudio.Test
 
         public Project Project { get; } = Mock.Of<Project>();
 
-        public string ProjectId
+        public Task<string> GetProjectIdAsync()
         {
-            get
-            {
-                return Guid.Empty.ToString();
-            }
+            return Task.FromResult(Guid.Empty.ToString());
         }
 
         public Task<string> GetProjectDirectoryAsync() => Task.FromResult(Path.GetDirectoryName(FullProjectPath));

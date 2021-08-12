@@ -51,7 +51,8 @@ namespace NuGet.VisualStudio
         /// </summary>
         EnvDTE.Project Project { get; }
 
-        string ProjectId { get; }
+        // Asynchronously get the project id.
+        Task<string> GetProjectIdAsync();
 
         /// <summary>
         /// Full path to a parent directory containing project file.

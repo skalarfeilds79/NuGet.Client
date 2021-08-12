@@ -25,7 +25,8 @@ namespace NuGet.PackageManagement.VisualStudio
             string jsonConfigPath,
             string msbuildProjectFilePath,
             IVsProjectAdapter vsProjectAdapter,
-            INuGetProjectServices projectServices)
+            INuGetProjectServices projectServices,
+            string projectId)
             : base(jsonConfigPath, msbuildProjectFilePath)
         {
             Assumes.Present(vsProjectAdapter);
@@ -33,7 +34,7 @@ namespace NuGet.PackageManagement.VisualStudio
 
             _vsProjectAdapter = vsProjectAdapter;
 
-            InternalMetadata.Add(NuGetProjectMetadataKeys.ProjectId, _vsProjectAdapter.ProjectId);
+            InternalMetadata.Add(NuGetProjectMetadataKeys.ProjectId, projectId);
             InternalMetadata.Add(NuGetProjectMetadataKeys.UniqueName, _vsProjectAdapter.CustomUniqueName);
 
             ProjectServices = projectServices;

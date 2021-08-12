@@ -100,7 +100,8 @@ namespace NuGet.PackageManagement.VisualStudio
                         projectJsonPath,
                         msbuildProjectFile.FullName,
                         vsProjectAdapter,
-                        projectServices);
+                        projectServices,
+                        await vsProjectAdapter.GetProjectIdAsync());
                 }
             }
 

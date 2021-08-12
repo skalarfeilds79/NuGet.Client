@@ -74,7 +74,8 @@ namespace NuGet.PackageManagement.VisualStudio
                 projectSystem,
                 folderNuGetProjectFullPath,
                 packagesConfigFolderPath,
-                projectServices);
+                projectServices,
+                await vsProjectAdapter.GetProjectIdAsync());
         }
 
         private async Task<INuGetProjectServices> CreateProjectServicesAsync(
